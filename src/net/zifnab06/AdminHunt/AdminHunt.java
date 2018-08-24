@@ -1,76 +1,96 @@
 package net.zifnab06.AdminHunt;
 
-import java.io.File;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.UUID;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import org.bukkit.OfflinePlayer;
-import org.bukkit.World;
+import com.sk89q.worldguard.bukkit.protection.events.DisallowedPVPEvent;
+import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.serialization.ConfigurationSerialization;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.EventPriority;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.Entity;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.ChatColor;
 
-import com.sk89q.worldguard.protection.events.DisallowedPVPEvent;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
+// ----------------------------------------------------------------------------------------------------------
+/**
+ * The main plugin class.
+ */
 public class AdminHunt extends JavaPlugin implements Listener {
 
+	// ------------------------------------------------------------------------------------------------------
+	/**
+	 * Stores the UUIDs of the players currently being hunted.
+	 */
+	private static final Set<UUID> ENABLED_PLAYERS = new HashSet<>();
 
-	private List<String> enabledPlayers;
-
-
+	// ------------------------------------------------------------------------------------------------------
+	/**
+	 * @see JavaPlugin#onEnable().
+	 */
 	@Override
-	public void onDisable(){
-        getConfig().set("playerList", enabledPlayers);
+	public void onEnable() {
+		this.getServer().getPluginManager().registerEvents(this, this);
+
+		saveDefaultConfig();
+
+		for (String uuidString : getConfig().getStringList("players")) {
+			try {
+				UUID uuid = UUID.fromString(uuidString);
+				ENABLED_PLAYERS.add(uuid);
+			} catch (IllegalArgumentException e) {
+				getLogger().info("Invalid UUID found in config: " + uuidString);
+			}
+		}
+
+		getLogger().info("AdminHunt has been started successfully.");
+	}
+
+	// ------------------------------------------------------------------------------------------------------
+	/**
+	 * @see JavaPlugin#onDisable().
+	 */
+	@Override
+	public void onDisable() {
+		List<String> serializePlayers = ENABLED_PLAYERS.stream()
+													   .map(UUID::toString)
+													   .collect(Collectors.toList());
+        getConfig().set("players", serializePlayers);
 		saveConfig();
 		getLogger().info("AdminHunt has stopped.");
 	}
 
-
-	@Override
-	public void onEnable() {
-		this.getServer().getPluginManager().registerEvents(this, this);
-		//Create new config file - only used for persistance between sessions
-		File config_file = new File(getDataFolder(), "config.yml");
-        if (!config_file.exists()) {
-			getConfig().options().copyDefaults(true);
-			getConfig().set("playerList", new ArrayList<String>());
-			saveConfig();
-		}
-		//restore players from last session
-        enabledPlayers = getConfig().getStringList("playerList");
-		getLogger().info("AdminHunt has been started successfully.");
-	}
-
-
+	// ------------------------------------------------------------------------------------------------------
+	/**
+	 * Handles commands.
+	 *
+	 * @see JavaPlugin#onCommand(CommandSender, Command, String, String[]).
+	 */
 	public boolean onCommand(CommandSender sender, Command command, String name, String[] args) {
 
 		if (command.getName().equalsIgnoreCase("adminhunt")) {
-			if (args.length == 0) return false;
-            if (args[0].equalsIgnoreCase("list")) return false; //block accidental "/adminhunt list"
-			if (sender.hasPermission("adminhunt.toggle")) {
-				toggleHuntedStatus(getCanonicalName(args[0]));
+			if (args.length == 0 || args[0].equalsIgnoreCase("list")) {
+				return false;
+			} else if (sender.hasPermission("adminhunt.toggle")) {
+				String playerName = args[0];
+				Player player = getServer().getPlayer(playerName);
+				toggleHuntedStatus(player);
 				return true;
 			}
 			return false;
 		}
 
 		if (command.getName().equalsIgnoreCase("adminhunt-list") && sender instanceof Player) {
-			if(sender.hasPermission("adminhunt.toggle.list")) {
-				String playerList = "Enabled Players:";
-                for (String player : enabledPlayers){
-                    playerList = playerList + " " + player;
-                }
+			if (sender.hasPermission("adminhunt.toggle.list")) {
+				String playerList = "Enabled players: " + ENABLED_PLAYERS.stream()
+																  		 .map(getServer()::getPlayer)
+																		 .map(Player::getName)
+																		 .collect(Collectors.joining(", "));
 				sender.sendMessage(playerList);
 				return true;
 			}
@@ -78,62 +98,59 @@ public class AdminHunt extends JavaPlugin implements Listener {
 		}
 
 		return false;
-
 	}
 
-
+	// ------------------------------------------------------------------------------------------------------
     /**
-     * Prevent WorldGuard from disabling PvP for hunted players, allowing admins to be attacked in PvE areas
+     * Prevent WorldGuard from disabling PvP for hunted players, allowing admins to be attacked in PvE areas.
      */
 	@EventHandler(priority = EventPriority.LOWEST)
 	private void onPVPDamage(DisallowedPVPEvent event) {
 		Player defender = event.getDefender();
 		Player attacker = event.getAttacker();
-		if (enabledPlayers.contains(defender.getName()) || enabledPlayers.contains(attacker.getName())) { //cancel event
+		if (isActive(defender) || isActive(attacker)) {
 			event.setCancelled(true);
 		}
 	}
 
-
+	// ------------------------------------------------------------------------------------------------------
     /**
-     * End the hunt for a player when they die
+     * End the hunt for a player when they die.
      */
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
-        if (enabledPlayers.contains(event.getEntity().getName())) {
-            toggleHuntedStatus(event.getEntity().getName());
-        }
+    	Player player = event.getEntity();
+    	if (isActive(player)) {
+    		toggleHuntedStatus(player);
+		}
     }
 
-
+	// ------------------------------------------------------------------------------------------------------
     /**
-     * Toggle the player's hunted status on or off
-     * @param player Name of the player to set
+     * Toggle the player's hunted status on or off.
+	 *
+     * @param player the player.
      */
-    private void toggleHuntedStatus(String player) {
-        if (!enabledPlayers.contains(player)) {
-            getServer().broadcastMessage(ChatColor.GREEN + "[AdminHunt] An admin hunt has begun! Find (and kill) " + player + " as quickly as you can!" + ChatColor.RESET);
-            enabledPlayers.add(player);
+    private void toggleHuntedStatus(Player player) {
+    	UUID uuid = player.getUniqueId();
+        if (!isActive(player)) {
+            getServer().broadcastMessage(ChatColor.GREEN + "[AdminHunt] An admin hunt has begun! Find (and kill) " + player.getName() + " as quickly as you can!" + ChatColor.RESET);
+            ENABLED_PLAYERS.add(uuid);
         } else {
-            getServer().broadcastMessage(ChatColor.GREEN + "[AdminHunt] The admin hunt has ended. " + player + " has been found." + ChatColor.RESET);
-            enabledPlayers.remove(player);
+            getServer().broadcastMessage(ChatColor.GREEN + "[AdminHunt] The admin hunt has ended. " + player.getName() + " has been found." + ChatColor.RESET);
+            ENABLED_PLAYERS.remove(uuid);
         }
     }
 
-
-    /**
-     * Normalize the player name if there's a match online, reducing the likelihood of capitalization issues.
-     * @param name The player name
-     * @return Case-corrected player name
-     */
-    private String getCanonicalName(String name) {
-        Player player = getServer().getPlayer(name);
-        if (player != null) {
-            return player.getName();
-        } else {
-            return name;
-        }
-    }
-
+	// ------------------------------------------------------------------------------------------------------
+	/**
+	 * Returns true if the player is being hunted.
+	 *
+	 * @param player the player.
+	 * @return true if the player is being hunted.
+	 */
+	private boolean isActive(Player player) {
+		return ENABLED_PLAYERS.contains(player.getUniqueId());
+	}
 
 }

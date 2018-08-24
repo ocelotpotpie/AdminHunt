@@ -2,24 +2,22 @@ name: AdminHunt
 version: ${project.version}
 description: ${project.description}
 database: true
-
-authors: [Tom Powell (zifnab06)]
+authors: [Tom Powell (zifnab06), redwall_hp, bermudalocket]
 website: ${project.url}
-
 main: net.zifnab06.AdminHunt.AdminHunt
-
 
 commands:
   adminhunt:
-    description: Toggle Player's AdminHunt mode
+    description: Toggle a player's AdminHunt mode
     permission: adminhunt.toggle
     usage: |
-           /<command> player - toggle player's AdminHunt mode
+           /<command> player - toggle the player's AdminHunt mode
   adminhunt-list:
     description: List players in AdminHunt mode
     permission: adminhunt.toggle.list
     usage: |
            /<command> - list all players in AdminHunt mode
+
 permissions:
   adminhunt.toggle:
     description: Allow use of /adminhunt command
