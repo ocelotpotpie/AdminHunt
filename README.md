@@ -6,9 +6,9 @@ Selectively allows users to bypass WorldGuard's PVP protection
 Dependencies
 ------------
 
-	Spigot 1.9 or higher
+	Spigot 1.13 or higher
 
-	Worldguard 6.0.0 or higher
+	Worldguard 7.0.0 or higher
 
 Usage
 -----
