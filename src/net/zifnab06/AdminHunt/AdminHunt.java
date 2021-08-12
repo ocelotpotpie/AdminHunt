@@ -103,7 +103,14 @@ public class AdminHunt extends JavaPlugin implements Listener {
                 return false;
             } else if (sender.hasPermission("adminhunt.toggle")) {
                 String playerName = args[0];
+
                 Player player = getServer().getPlayer(playerName);
+
+                if (player == null) {
+                    sender.sendMessage(Component.text("Please use the name of a valid player."));
+                    return false;
+                }
+
                 toggleHuntedStatus(player);
                 return true;
             }
