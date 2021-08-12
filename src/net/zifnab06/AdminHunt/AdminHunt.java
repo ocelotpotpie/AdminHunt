@@ -1,8 +1,10 @@
 package net.zifnab06.AdminHunt;
 
+import com.sk89q.worldedit.util.formatting.text.format.TextColor;
 import com.sk89q.worldguard.bukkit.protection.events.DisallowedPVPEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -186,10 +188,10 @@ public class AdminHunt extends JavaPlugin implements Listener {
         UUID uuid = player.getUniqueId();
         Component msg;
         if (isActive(player)) {
-            msg = Component.text("[AdminHunt] The admin hunt has ended. " + player.getName() + " has been found.");
+            msg = Component.text("[AdminHunt] The admin hunt has ended. " + player.getName() + " has been found.", NamedTextColor.GREEN);
             ENABLED_PLAYERS.remove(uuid);
         } else {
-            msg = Component.text("[AdminHunt] An admin hunt has begun! Find (and kill) " + player.getName() + " as quickly as you can!");
+            msg = Component.text("[AdminHunt] An admin hunt has begun! Find (and kill) " + player.getName() + " as quickly as you can!", NamedTextColor.GREEN);
             ENABLED_PLAYERS.add(uuid);
         }
         getServer().sendMessage(msg);
