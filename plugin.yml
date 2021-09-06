@@ -5,6 +5,7 @@ database: true
 authors: [Tom Powell (zifnab06), redwall_hp, bermudalocket]
 website: ${project.url}
 main: net.zifnab06.AdminHunt.AdminHunt
+api-version: 1.17
 
 commands:
   adminhunt:
